@@ -1,48 +1,52 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from database import SessionLocal
 from pydantic import BaseModel
 from typing import List
 
 app = FastAPI()
 
-# This defines what the Developer's frontend will send to you
-class ServiceItem(BaseModel):
+# Database connection helper
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+class ServiceRequest(BaseModel):
     service_name: str
     quantity: int
 
 @app.get("/")
 def home():
-    return {"message": "Cloud Cost Assistant API is Running"}
+    return {"message": "Pure SQL Cloud API is Live"}
 
 @app.post("/calculate")
-async def calculate_manual_cost(items: List[ServiceItem]):
-    # Hardcoded Pricing Master (We will move this to a Database in Week 2)
-    # Prices are monthly estimates based on standard 24/7 usage (730 hours)
-    prices = {
-        "EC2": 30.37, 
-        "S3": 2.30, 
-        "RDS": 12.41,
-        "Lambda": 0.20,
-        "ELB": 16.42
-    }
-    
-    total = 0
-    breakdown = []
+async def calculate_cost(items: List[ServiceRequest], db: Session = Depends(get_db)):
+    total_cost = 0
+    details = []
     
     for item in items:
-        # Get the price, default to 0 if service is not in our list
-        unit_price = prices.get(item.service_name.upper(), 0)
-        item_total = unit_price * item.quantity
-        total += item_total
+        # ASLI SQL QUERY YAHA HAI!
+        sql_query = text("SELECT service_name, hourly_rate FROM pricing_master WHERE service_name = :name")
+        result = db.execute(sql_query, {"name": item['service_name'].upper()}).fetchone()
         
-        breakdown.append({
-            "service": item.service_name,
-            "unit_price": unit_price,
-            "quantity": item.quantity,
-            "subtotal": round(item_total, 2)
-        })
-        
+        if result:
+            name, rate = result
+            # Monthly cost = rate * 730 hours * quantity
+            subtotal = rate * 730 * item['quantity']
+            total_cost += subtotal
+            
+            details.append({
+                "service": name,
+                "monthly_cost": round(subtotal, 2)
+            })
+        else:
+            raise HTTPException(status_code=404, detail=f"Service {item['service_name']} not found in SQL")
+
     return {
-        "total_monthly_estimate": round(total, 2),
-        "currency": "USD",
-        "details": breakdown
+        "total_monthly_estimate": round(total_cost, 2),
+         "detail" : details
     }
