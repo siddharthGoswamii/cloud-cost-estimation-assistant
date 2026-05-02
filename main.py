@@ -31,12 +31,14 @@ async def calculate_cost(items: List[ServiceRequest], db: Session = Depends(get_
     for item in items:
         # ASLI SQL QUERY YAHA HAI!
         sql_query = text("SELECT service_name, hourly_rate FROM pricing_master WHERE service_name = :name")
-        result = db.execute(sql_query, {"name": item['service_name'].upper()}).fetchone()
+        
+        # CHANGE HERE: item['service_name'] ko item.service_name kar diya
+        result = db.execute(sql_query, {"name": item.service_name.upper()}).fetchone()
         
         if result:
             name, rate = result
-            # Monthly cost = rate * 730 hours * quantity
-            subtotal = rate * 730 * item['quantity']
+            # CHANGE HERE: item['quantity'] ko item.quantity kar diya
+            subtotal = rate * 730 * item.quantity
             total_cost += subtotal
             
             details.append({
@@ -44,9 +46,9 @@ async def calculate_cost(items: List[ServiceRequest], db: Session = Depends(get_
                 "monthly_cost": round(subtotal, 2)
             })
         else:
-            raise HTTPException(status_code=404, detail=f"Service {item['service_name']} not found in SQL")
+            raise HTTPException(status_code=404, detail=f"Service {item.service_name} not found")
 
     return {
         "total_monthly_estimate": round(total_cost, 2),
-         "detail" : details
+        "details": details
     }
