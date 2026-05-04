@@ -40,6 +40,13 @@ async def calculate_cost(items: List[ServiceRequest], db: Session = Depends(get_
             # CHANGE HERE: item['quantity'] ko item.quantity kar diya
             subtotal = rate * 730 * item.quantity
             total_cost += subtotal
+
+            # SAVING HISTORY
+            sql_insert = text("""
+                INSERT INTO calculation_history (service_name, quantity, total_cost) 
+                VALUES (:name, :qty, :cost)
+            """)
+            db.execute(sql_insert, {"name": name, "qty": item.quantity, "cost": subtotal})
             
             details.append({
                 "service": name,
@@ -47,8 +54,28 @@ async def calculate_cost(items: List[ServiceRequest], db: Session = Depends(get_
             })
         else:
             raise HTTPException(status_code=404, detail=f"Service {item.service_name} not found")
+    
+    db.commit()
 
     return {
         "total_monthly_estimate": round(total_cost, 2),
         "details": details
     }
+
+@app.get("/history")
+def get_history(db: Session = Depends(get_db)):
+    # Saari history nikalne ki SQL query
+    query = text("SELECT * FROM calculation_history ORDER BY timestamp DESC")
+    results = db.execute(query).fetchall()
+    
+    # Result ko readable format mein convert karo
+    history_list = []
+    for row in results:
+        history_list.append({
+            "id": row[0],
+            "time": row[1],
+            "service": row[2],
+            "qty": row[3],
+            "cost": row[4]
+        })
+    return {"usage_history": history_list}

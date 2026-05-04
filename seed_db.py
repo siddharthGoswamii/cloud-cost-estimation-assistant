@@ -15,6 +15,18 @@ def setup_db():
                 hourly_rate REAL NOT NULL
             )
         """))
+
+        # seed_db.py mein purani table ke niche ye add karo
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS calculation_history (
+            id SERIAL PRIMARY KEY,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            service_name TEXT,
+            quantity INTEGER,
+            total_cost REAL
+            )
+        """))
+        conn.commit()
         
         # 3. Data Insert karo
         conn.execute(text("INSERT INTO pricing_master (service_name, instance_type, hourly_rate) VALUES ('EC2', 't3.medium', 0.0416)"))
