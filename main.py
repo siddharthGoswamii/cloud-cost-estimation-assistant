@@ -98,3 +98,16 @@ async def update_service_price(data: PriceUpdate, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Service not found in Database")
         
     return {"message": f"Price for {data.service_name} updated to {data.new_rate}"}
+
+#ADDING NEW SERVICE
+class NewService(BaseModel):
+    service_name: str
+    instance_type: str
+    hourly_rate: float
+
+@app.delete("/clear-history")
+async def clear_calculation_history(db: Session = Depends(get_db)):
+    query = text("DELETE FROM calculation_history")
+    db.execute(query)
+    db.commit()
+    return {"message": "History has been cleared"}
