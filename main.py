@@ -4,8 +4,31 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from pydantic import BaseModel
 from typing import List
+import time
+from fastapi import Request
 
 app = FastAPI()
+
+#LOGGING API HITS
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    # This logs the time taken for every SQL query/API call in your terminal
+    print(f"Request: {request.url.path} | Time: {process_time:.4f}s")
+    return response
+
+#GLOBAL ERROR HANDLING 
+from sqlalchemy.exc import SQLAlchemyError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(SQLAlchemyError)
+async def sqlalchemy_exception_handler(request: Request, exc: SQLAlchemyError):
+    return JSONResponse(
+        status_code=500,
+        content={"message": "Database is acting up, bhai! Please check your Postgres connection."},
+    )
 
 # Database connection helper
 def get_db():
@@ -30,7 +53,7 @@ async def calculate_cost(items: List[ServiceRequest], db: Session = Depends(get_
     
     for item in items:
         # ASLI SQL QUERY YAHA HAI!
-        sql_query = text("SELECT service_name, hourly_rate FROM pricing_master WHERE service_name = :name")
+        sql_query = text("SELECT service_name, hourly_rate FROM pricing_master WHERE TRIM(UPPER(service_name)) = TRIM(UPPER(:name))")
         
         # CHANGE HERE: item['service_name'] ko item.service_name kar diya
         result = db.execute(sql_query, {"name": item.service_name.upper()}).fetchone()
