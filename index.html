@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Cost Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white p-10">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-4xl font-bold mb-8 text-blue-400">Cloud Cost Assistant</h1>
+
+        <!-- Calculator Section -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-10">
+            <h2 class="text-xl mb-4">Calculate Estimate</h2>
+            <div class="flex gap-4">
+                <input id="service" type="text" placeholder="Service (e.g. EC2)" class="bg-gray-700 p-2 rounded flex-1">
+                <input id="quantity" type="number" placeholder="Qty" class="bg-gray-700 p-2 rounded w-24">
+                <button onclick="calculate()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded font-bold">Calculate</button>
+            </div>
+            <div id="result" class="mt-4 text-lg font-semibold text-green-400"></div>
+        </div>
+
+        <!-- History Section -->
+        <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl">Calculation History (PostgreSQL)</h2>
+                <button onclick="loadHistory()" class="text-sm text-blue-400 hover:underline">Refresh</button>
+            </div>
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-gray-700">
+                        <th class="py-2">Service</th>
+                        <th class="py-2">Qty</th>
+                        <th class="py-2">Total Cost</th>
+                        <th class="py-2">Time</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+
+        async function calculate() {
+            const service = document.getElementById('service').value;
+            const qty = document.getElementById('quantity').value;
+
+            const response = await fetch(`${API_BASE}/calculate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify([{ service_name: service, quantity: parseInt(qty) }])
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                document.getElementById('result').innerText = `Monthly Estimate: $${data.total_monthly_estimate}`;
+                loadHistory(); // Refresh table automatically
+            } else {
+                alert("Error: " + data.detail);
+            }
+        }
+
+        async function loadHistory() {
+            const response = await fetch(`${API_BASE}/history`);
+            const data = await response.json();
+            const table = document.getElementById('historyTable');
+            table.innerHTML = "";
+
+            data.usage_history.forEach(row => {
+                table.innerHTML += `
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2">${row.service}</td>
+                        <td class="py-2">${row.qty}</td>
+                        <td class="py-2 text-green-400">$${row.cost.toFixed(2)}</td>
+                        <td class="py-2 text-gray-400 text-sm">${new Date(row.time).toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Load history on startup
+        loadHistory();
+    </script>
+</body>
+</html>
