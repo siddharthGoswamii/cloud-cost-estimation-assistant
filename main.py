@@ -79,3 +79,22 @@ def get_history(db: Session = Depends(get_db)):
             "cost": row[4]
         })
     return {"usage_history": history_list}
+
+# 1. Schema for Updating Price
+class PriceUpdate(BaseModel):
+    service_name: str
+    new_rate: float
+
+# 2. Update Endpoint
+@app.put("/update-price")
+async def update_service_price(data: PriceUpdate, db: Session = Depends(get_db)):
+    # SQL UPDATE Query
+    query = text("UPDATE pricing_master SET hourly_rate = :rate WHERE service_name = :name")
+    result = db.execute(query, {"rate": data.new_rate, "name": data.service_name.upper()})
+    
+    db.commit() # Save the changes
+    
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Service not found in Database")
+        
+    return {"message": f"Price for {data.service_name} updated to {data.new_rate}"}
