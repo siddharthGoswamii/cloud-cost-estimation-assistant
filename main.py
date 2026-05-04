@@ -9,6 +9,15 @@ from fastapi import Request
 
 app = FastAPI()
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_methods=["*"],  # Allows all methods (GET, POST, PUT, DELETE)
+    allow_headers=["*"],  # Allows all headers
+)
+
 #LOGGING API HITS
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
