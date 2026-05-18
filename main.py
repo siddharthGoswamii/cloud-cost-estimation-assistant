@@ -124,7 +124,7 @@ async def update_service_price(data: PriceUpdate, db: Session = Depends(get_db))
     query = text("UPDATE pricing_master SET hourly_rate = :rate WHERE service_name = :name")
     result = db.execute(query, {"rate": data.new_rate, "name": data.service_name.upper()})
     
-    db.commit() # Save the changes
+    db.commit() 
     
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Service not found in Database")
