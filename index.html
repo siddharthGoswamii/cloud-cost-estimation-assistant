@@ -3,86 +3,548 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Cost Assistant</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-900 text-white p-10">
-    <div class="max-w-4xl mx-auto">
-        <h1 class="text-4xl font-bold mb-8 text-blue-400">Cloud Cost Assistant</h1>
+    <title>Cloud Cost Assistant - AWS Pricing Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-        <!-- Calculator Section -->
-        <div class="bg-gray-800 p-6 rounded-lg shadow-lg mb-10">
-            <h2 class="text-xl mb-4">Calculate Estimate</h2>
-            <div class="flex gap-4">
-                <input id="service" type="text" placeholder="Service (e.g. EC2)" class="bg-gray-700 p-2 rounded flex-1">
-                <input id="quantity" type="number" placeholder="Qty" class="bg-gray-700 p-2 rounded w-24">
-                <button onclick="calculate()" class="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded font-bold">Calculate</button>
-            </div>
-            <div id="result" class="mt-4 text-lg font-semibold text-green-400"></div>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .service-card {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .service-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            border-color: #667eea;
+        }
+
+        .service-card.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .service-card h3 {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+        }
+
+        .service-card p {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .config-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .result-panel {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .result-panel.show {
+            display: block;
+            animation: slideIn 0.5s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .cost-display {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .breakdown {
+            background: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+        }
+
+        .breakdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .api-info {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .api-info code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>☁️ Cloud Cost Assistant</h1>
+            <p>AWS-Style Pricing Calculator with 30+ Services</p>
         </div>
 
-        <!-- History Section -->
-        <div class="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl">Calculation History (PostgreSQL)</h2>
-                <button onclick="loadHistory()" class="text-sm text-blue-400 hover:underline">Refresh</button>
+        <div class="main-content">
+            <!-- Features Section -->
+            <div class="section">
+                <h2>🚀 Key Features</h2>
+                <div class="features">
+                    <div class="feature-card">
+                        <div class="feature-icon">🌍</div>
+                        <h3>Multi-Region Support</h3>
+                        <p>Calculate costs across 10+ AWS regions with regional pricing multipliers</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>30+ Services</h3>
+                        <p>Comprehensive pricing for Compute, Storage, Database, Networking & more</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3>Tiered Pricing</h3>
+                        <p>Accurate tiered pricing models for S3, data transfer, and usage-based services</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3>Architecture Analysis</h3>
+                        <p>Analyze architecture diagrams and get instant cost estimates</p>
+                    </div>
+                </div>
             </div>
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b border-gray-700">
-                        <th class="py-2">Service</th>
-                        <th class="py-2">Qty</th>
-                        <th class="py-2">Total Cost</th>
-                        <th class="py-2">Time</th>
-                    </tr>
-                </thead>
-                <tbody id="historyTable"></tbody>
-            </table>
+
+            <!-- Quick Calculator -->
+            <div class="section">
+                <h2>💰 Quick Cost Calculator</h2>
+                
+                <div class="form-group">
+                    <label>Select AWS Service:</label>
+                    <select id="serviceSelect">
+                        <option value="">-- Choose a service --</option>
+                        <option value="EC2">EC2 - Elastic Compute Cloud</option>
+                        <option value="S3">S3 - Simple Storage Service</option>
+                        <option value="RDS">RDS - Relational Database</option>
+                        <option value="Lambda">Lambda - Serverless Compute</option>
+                        <option value="DynamoDB">DynamoDB - NoSQL Database</option>
+                        <option value="CloudFront">CloudFront - CDN</option>
+                        <option value="ELB">ELB - Load Balancer</option>
+                        <option value="NAT Gateway">NAT Gateway</option>
+                    </select>
+                </div>
+
+                <div id="configPanel" class="config-panel" style="display: none;">
+                    <div class="form-group">
+                        <label>Region:</label>
+                        <select id="regionSelect">
+                            <option value="us-east-1">US East (N. Virginia)</option>
+                            <option value="us-west-2">US West (Oregon)</option>
+                            <option value="eu-west-1">EU (Ireland)</option>
+                            <option value="ap-south-1">Asia Pacific (Mumbai)</option>
+                            <option value="ap-northeast-1">Asia Pacific (Tokyo)</option>
+                        </select>
+                    </div>
+
+                    <div id="serviceConfig"></div>
+
+                    <button class="btn" onclick="calculateCost()">Calculate Cost</button>
+                </div>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Calculating...</p>
+                </div>
+
+                <div class="result-panel" id="resultPanel">
+                    <h3>💵 Cost Estimate</h3>
+                    <div class="cost-display" id="costDisplay">$0.00</div>
+                    <div class="breakdown" id="breakdown"></div>
+                </div>
+            </div>
+
+            <!-- API Information -->
+            <div class="section">
+                <h2>🔌 API Endpoints</h2>
+                <div class="api-info">
+                    <p><strong>Base URL:</strong> <code>http://localhost:8000</code></p>
+                    <p style="margin-top: 10px;"><strong>Available Endpoints:</strong></p>
+                    <ul style="margin-left: 20px; margin-top: 10px;">
+                        <li><code>GET /services</code> - List all services</li>
+                        <li><code>POST /calculate</code> - Calculate single service cost</li>
+                        <li><code>POST /calculate-multiple</code> - Calculate multiple services</li>
+                        <li><code>GET /regions</code> - List all regions</li>
+                        <li><code>GET /history</code> - Get calculation history</li>
+                        <li><code>GET /stats</code> - Get API statistics</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Example Usage -->
+            <div class="section">
+                <h2>📝 Example API Request</h2>
+                <div class="api-info">
+                    <pre style="background: #fff; padding: 15px; border-radius: 8px; overflow-x: auto;">
+POST /calculate
+{
+  "service": "EC2",
+  "config": {
+    "region": "us-east-1",
+    "instanceType": "t3.medium",
+    "hours": 730,
+    "count": 2
+  }
+}</pre>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        const API_BASE = "http://127.0.0.1:8000";
+        const API_BASE = 'http://localhost:8000';
 
-        async function calculate() {
-            const service = document.getElementById('service').value;
-            const qty = document.getElementById('quantity').value;
+        const serviceConfigs = {
+            'EC2': `
+                <div class="form-group">
+                    <label>Instance Type:</label>
+                    <select id="instanceType">
+                        <option value="t3.micro">t3.micro</option>
+                        <option value="t3.small">t3.small</option>
+                        <option value="t3.medium">t3.medium</option>
+                        <option value="t3.large">t3.large</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Hours per Month:</label>
+                    <input type="number" id="hours" value="730" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Number of Instances:</label>
+                    <input type="number" id="count" value="1" min="1">
+                </div>
+            `,
+            'S3': `
+                <div class="form-group">
+                    <label>Storage (GB):</label>
+                    <input type="number" id="usageGB" value="100" min="0">
+                </div>
+            `,
+            'RDS': `
+                <div class="form-group">
+                    <label>Instance Type:</label>
+                    <select id="instanceType">
+                        <option value="db.t3.micro">db.t3.micro</option>
+                        <option value="db.t3.small">db.t3.small</option>
+                        <option value="db.t3.medium">db.t3.medium</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Storage (GB):</label>
+                    <input type="number" id="storageGB" value="20" min="1">
+                </div>
+                <div class="form-group">
+                    <label>Hours per Month:</label>
+                    <input type="number" id="hours" value="730" min="1">
+                </div>
+            `,
+            'Lambda': `
+                <div class="form-group">
+                    <label>Requests (millions):</label>
+                    <input type="number" id="requests" value="1" min="0" step="0.1">
+                </div>
+                <div class="form-group">
+                    <label>GB-Seconds:</label>
+                    <input type="number" id="gbSeconds" value="12800" min="0">
+                </div>
+            `
+        };
 
-            const response = await fetch(`${API_BASE}/calculate`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify([{ service_name: service, quantity: parseInt(qty) }])
-            });
-
-            const data = await response.json();
-            if (response.ok) {
-                document.getElementById('result').innerText = `Monthly Estimate: $${data.total_monthly_estimate}`;
-                loadHistory(); // Refresh table automatically
+        document.getElementById('serviceSelect').addEventListener('change', function() {
+            const service = this.value;
+            const configPanel = document.getElementById('configPanel');
+            const serviceConfig = document.getElementById('serviceConfig');
+            
+            if (service && serviceConfigs[service]) {
+                serviceConfig.innerHTML = serviceConfigs[service];
+                configPanel.style.display = 'block';
+            } else if (service) {
+                serviceConfig.innerHTML = '<p>Configuration options coming soon for this service.</p>';
+                configPanel.style.display = 'block';
             } else {
-                alert("Error: " + data.detail);
+                configPanel.style.display = 'none';
+            }
+            
+            document.getElementById('resultPanel').classList.remove('show');
+        });
+
+        async function calculateCost() {
+            const service = document.getElementById('serviceSelect').value;
+            const region = document.getElementById('regionSelect').value;
+            
+            if (!service) {
+                alert('Please select a service');
+                return;
+            }
+
+            // Build config based on service
+            const config = { region };
+            
+            if (service === 'EC2' || service === 'RDS') {
+                config.instanceType = document.getElementById('instanceType').value;
+                config.hours = parseInt(document.getElementById('hours').value);
+                if (service === 'EC2') {
+                    config.count = parseInt(document.getElementById('count').value);
+                }
+                if (service === 'RDS') {
+                    config.storageGB = parseInt(document.getElementById('storageGB').value);
+                }
+            } else if (service === 'S3') {
+                config.usageGB = parseInt(document.getElementById('usageGB').value);
+            } else if (service === 'Lambda') {
+                config.requests = parseInt(document.getElementById('requests').value) * 1000000;
+                config.gbSeconds = parseInt(document.getElementById('gbSeconds').value);
+            }
+
+            // Show loading
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('resultPanel').classList.remove('show');
+
+            try {
+                const response = await fetch(`${API_BASE}/calculate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ service, config })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResult(data.result);
+                } else {
+                    alert('Calculation failed: ' + (data.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error connecting to API. Make sure the server is running on port 8000.');
+                console.error(error);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
             }
         }
 
-        async function loadHistory() {
-            const response = await fetch(`${API_BASE}/history`);
-            const data = await response.json();
-            const table = document.getElementById('historyTable');
-            table.innerHTML = "";
-
-            data.usage_history.forEach(row => {
-                table.innerHTML += `
-                    <tr class="border-b border-gray-700">
-                        <td class="py-2">${row.service}</td>
-                        <td class="py-2">${row.qty}</td>
-                        <td class="py-2 text-green-400">$${row.cost.toFixed(2)}</td>
-                        <td class="py-2 text-gray-400 text-sm">${new Date(row.time).toLocaleString()}</td>
-                    </tr>
+        function displayResult(result) {
+            document.getElementById('costDisplay').textContent = `$${result.cost.toFixed(2)}`;
+            
+            const breakdown = document.getElementById('breakdown');
+            breakdown.innerHTML = '<h4>Cost Breakdown:</h4>';
+            
+            for (const [key, value] of Object.entries(result.breakdown)) {
+                const item = document.createElement('div');
+                item.className = 'breakdown-item';
+                item.innerHTML = `
+                    <span>${key}:</span>
+                    <span>${typeof value === 'number' ? value.toFixed(4) : value}</span>
                 `;
-            });
+                breakdown.appendChild(item);
+            }
+            
+            const regionItem = document.createElement('div');
+            regionItem.className = 'breakdown-item';
+            regionItem.innerHTML = `
+                <span>Region Multiplier:</span>
+                <span>${result.region_multiplier}x</span>
+            `;
+            breakdown.appendChild(regionItem);
+            
+            document.getElementById('resultPanel').classList.add('show');
         }
-
-        // Load history on startup
-        loadHistory();
     </script>
 </body>
 </html>
