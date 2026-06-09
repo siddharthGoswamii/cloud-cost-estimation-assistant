@@ -75,7 +75,7 @@ See `docs/` folder for detailed guides:
 
 - **Backend**: Python, FastAPI, SQLAlchemy, boto3
 - **Frontend**: HTML, CSS, JavaScript
-- **Database**: SQLite
+- **Database**: PostgreSQL
 - **Cloud**: AWS Pricing API
 
 ## 📝 License
