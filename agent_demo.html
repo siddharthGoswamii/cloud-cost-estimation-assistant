@@ -372,6 +372,30 @@
                 </div>
             </div>
 
+            <!-- Example Prompts Section -->
+            <div class="section">
+                <h2>✨ Try These Example Prompts</h2>
+                <p style="margin-bottom: 15px; color: #666;">Click any example below to auto-fill the description with detailed configurations:</p>
+                <div class="quick-patterns">
+                    <div class="pattern-card" onclick="loadExamplePrompt('ecommerce')">
+                        <h4>🛒 E-commerce Platform</h4>
+                        <p>5 EC2 instances, RDS database, S3 storage, CloudFront CDN, caching, and messaging</p>
+                    </div>
+                    <div class="pattern-card" onclick="loadExamplePrompt('serverless_api')">
+                        <h4>⚡ Serverless API</h4>
+                        <p>Lambda functions, API Gateway, DynamoDB, S3 storage with high request volume</p>
+                    </div>
+                    <div class="pattern-card" onclick="loadExamplePrompt('microservices')">
+                        <h4>🐳 Microservices Platform</h4>
+                        <p>EKS cluster, multiple EC2 workers, RDS PostgreSQL, ElastiCache, load balancer</p>
+                    </div>
+                    <div class="pattern-card" onclick="loadExamplePrompt('data_pipeline')">
+                        <h4>📊 Data Analytics Pipeline</h4>
+                        <p>Kinesis streaming, Lambda processing, S3 data lake, Athena queries</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Diagram Analysis Section -->
             <div class="section">
                 <h2>📤 Upload Architecture Diagram or Describe</h2>
@@ -463,6 +487,74 @@ Example with configurations:
     <script>
         const API_BASE = 'http://localhost:8000';
         let uploadedImageData = null;
+
+        // Load example prompts with detailed configurations
+        function loadExamplePrompt(exampleType) {
+            const diagramText = document.getElementById('diagramText');
+            const scaleSelect = document.getElementById('scale');
+            
+            const examples = {
+                'ecommerce': {
+                    text: `E-commerce Platform in us-east-1 region with the following configuration:
+
+- 5 EC2 t3.large instances running 730 hours/month behind an Application Load Balancer
+- RDS MySQL db.t3.large database with Multi-AZ deployment and 500GB storage
+- S3 bucket with 2TB (2000GB) of storage for product images
+- CloudFront CDN with 1TB (1000GB) data transfer per month
+- ElastiCache Redis cache.t3.small cluster running 730 hours/month
+- SQS queue processing 10 million requests per month
+- SNS for 1 million notifications per month`,
+                    scale: 'medium'
+                },
+                'serverless_api': {
+                    text: `Serverless API Platform in us-east-1 region with the following configuration:
+
+- Lambda with 50 million requests per month and 100,000 GB-seconds of compute
+- API Gateway handling 50 million requests per month
+- DynamoDB with 10GB storage, 5 million read requests and 5 million write requests per month
+- S3 bucket with 100GB storage for static assets
+- CloudWatch Logs with 50GB of log data per month`,
+                    scale: 'medium'
+                },
+                'microservices': {
+                    text: `Microservices Platform in us-west-2 region with the following configuration:
+
+- EKS cluster with 10 EC2 m5.large worker nodes running 730 hours/month each
+- RDS PostgreSQL db.r5.large database with Multi-AZ and 1TB (1000GB) storage
+- ElastiCache Redis cache.r5.large cluster running 730 hours/month
+- Application Load Balancer handling traffic
+- S3 bucket with 500GB storage for application data
+- CloudWatch monitoring and logging with 100GB logs per month`,
+                    scale: 'large'
+                },
+                'data_pipeline': {
+                    text: `Data Analytics Pipeline in ap-south-1 region with the following configuration:
+
+- Kinesis Data Stream ingesting 1GB per hour (730GB per month)
+- Lambda processing 20 million requests with 200,000 GB-seconds of compute
+- S3 Data Lake with 10TB (10000GB) of storage
+- Athena querying 5TB (5000GB) of data per month
+- Glue ETL jobs running 100 hours per month
+- CloudWatch Logs with 200GB of log data per month`,
+                    scale: 'large'
+                }
+            };
+            
+            const example = examples[exampleType];
+            if (example) {
+                diagramText.value = example.text;
+                scaleSelect.value = example.scale;
+                
+                // Scroll to the text area
+                diagramText.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Highlight the textarea briefly
+                diagramText.style.border = '3px solid #667eea';
+                setTimeout(() => {
+                    diagramText.style.border = '2px solid #e9ecef';
+                }, 1500);
+            }
+        }
 
         function handleImageUpload(event) {
             const file = event.target.files[0];
