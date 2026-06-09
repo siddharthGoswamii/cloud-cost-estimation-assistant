@@ -5,12 +5,15 @@ FastAPI application with AWS-style pricing engine
 
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import time
 from datetime import datetime
+import os
 
 from database import SessionLocal, get_db
 from models import (
@@ -18,11 +21,18 @@ from models import (
     ServiceConfiguration, ArchitectureDiagram
 )
 from service_detector import ServiceDetector, ConversationalAgent
+from conversational_cost_agent import ConversationalCostAgent
 
 # Initialize service detector and conversational agent
 service_detector = ServiceDetector()
 conversational_agent = ConversationalAgent()
 from pricing_engine import PricingEngine
+
+# Initialize pricing engine first
+pricing_engine = PricingEngine()
+
+# Initialize advanced conversational agent with pricing engine
+advanced_agent = ConversationalCostAgent(pricing_engine=pricing_engine)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -41,6 +51,23 @@ app.add_middleware(
 
 # Initialize pricing engine
 pricing_engine = PricingEngine()
+
+
+# ==================== STATIC FILES ====================
+
+# Serve HTML files
+@app.get("/")
+async def read_root():
+    """Redirect to agent demo"""
+    return FileResponse("agent_demo.html")
+
+@app.get("/{file_name}.html")
+async def serve_html(file_name: str):
+    """Serve HTML files"""
+    file_path = f"{file_name}.html"
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    raise HTTPException(status_code=404, detail="File not found")
 
 
 # ==================== MIDDLEWARE ====================
@@ -773,6 +800,135 @@ def get_statistics(db: Session = Depends(get_db)):
         "active_services": db.query(func.count(Service.id)).filter(
             Service.active == True
         ).scalar()
+    }
+
+
+# ==================== ADVANCED CONVERSATIONAL AGENT ENDPOINTS ====================
+
+class ConversationalRequest(BaseModel):
+    """Request model for conversational agent"""
+    session_id: str = Field(..., description="Unique session identifier")
+    message: str = Field(..., description="User message or architecture description")
+    image_data: Optional[str] = Field(None, description="Base64 encoded image data")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "session_id": "user_123_session_1",
+                "message": "I have a web application with 5 EC2 t3.large instances in us-east-1, RDS MySQL db.t3.large with 500GB storage, and S3 with 2TB of data"
+            }
+        }
+
+
+class SessionStateResponse(BaseModel):
+    """Response model for session state"""
+    session_id: str
+    conversation_turn: int
+    total_monthly_cost: float
+    total_annual_cost: float
+    services_count: int
+
+
+@app.post("/chat")
+def conversational_chat(request: ConversationalRequest):
+    """
+    Advanced conversational endpoint with full session memory
+    Maintains context across multiple turns
+    """
+    try:
+        response_text = advanced_agent.process_message(
+            session_id=request.session_id,
+            user_message=request.message,
+            image_data=request.image_data
+        )
+        
+        session = advanced_agent.get_session(request.session_id)
+        
+        # Build services array for frontend
+        services_array = []
+        for service in session.services:
+            services_array.append({
+                "name": service.name,
+                "instance_type": service.instance_type,
+                "quantity": service.quantity,
+                "hours_per_month": int(service.hours_per_day * service.days_per_month),
+                "storage_gb": service.storage_gb,
+                "unit_price": service.unit_price,
+                "monthly_cost": service.monthly_cost,
+                "assumptions": service.assumptions
+            })
+        
+        # Debug logging
+        print(f"\n=== CHAT RESPONSE DEBUG ===")
+        print(f"Session ID: {session.session_id}")
+        print(f"Services detected: {len(services_array)}")
+        for svc in services_array:
+            print(f"  - {svc['name']}: ${svc['monthly_cost']:.2f}/mo (type: {svc['instance_type']}, qty: {svc['quantity']})")
+        print(f"Total Monthly Cost: ${session.total_monthly_cost:.2f}")
+        print(f"=========================\n")
+        
+        return {
+            "success": True,
+            "message": response_text,
+            "session_id": session.session_id,
+            "turn": session.conversation_turn,
+            "region": session.region,
+            "cloud_provider": session.cloud_provider,
+            "scale": session.scale,
+            "services": services_array,
+            "total_monthly_cost": round(session.total_monthly_cost, 2),
+            "total_annual_cost": round(session.total_annual_cost, 2),
+            "services_count": len(services_array)
+        }
+    except Exception as e:
+        print(f"ERROR in /chat: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+
+
+@app.get("/session/{session_id}")
+def get_session_state(session_id: str):
+    """Get current session state"""
+    session = advanced_agent.get_session(session_id)
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {
+        "success": True,
+        "session": session.to_dict()
+    }
+
+
+@app.delete("/session/{session_id}")
+def clear_session(session_id: str):
+    """Clear/reset a session"""
+    if session_id in advanced_agent.sessions:
+        del advanced_agent.sessions[session_id]
+        return {
+            "success": True,
+            "message": f"Session {session_id} cleared"
+        }
+    raise HTTPException(status_code=404, detail="Session not found")
+
+
+@app.get("/sessions")
+def list_sessions():
+    """List all active sessions"""
+    return {
+        "success": True,
+        "sessions": [
+            {
+                "session_id": sid,
+                "conversation_turn": session.conversation_turn,
+                "services_count": len(session.services),
+                "total_cost": session.total_monthly_cost,
+                "created_at": session.created_at,
+                "updated_at": session.updated_at
+            }
+            for sid, session in advanced_agent.sessions.items()
+        ]
     }
 
 
