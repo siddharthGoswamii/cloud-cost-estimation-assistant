@@ -55,18 +55,21 @@ pricing_engine = PricingEngine()
 
 # ==================== STATIC FILES ====================
 
-# Serve HTML files
+# Serve HTML files from frontend folder
 @app.get("/")
 async def read_root():
     """Redirect to agent demo"""
-    return FileResponse("agent_demo.html")
+    frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "agent_demo.html")
+    if os.path.exists(frontend_path):
+        return FileResponse(frontend_path)
+    raise HTTPException(status_code=404, detail="Frontend not found")
 
 @app.get("/{file_name}.html")
 async def serve_html(file_name: str):
-    """Serve HTML files"""
-    file_path = f"{file_name}.html"
-    if os.path.exists(file_path):
-        return FileResponse(file_path)
+    """Serve HTML files from frontend folder"""
+    frontend_path = os.path.join(os.path.dirname(__file__), "..", "frontend", f"{file_name}.html")
+    if os.path.exists(frontend_path):
+        return FileResponse(frontend_path)
     raise HTTPException(status_code=404, detail="File not found")
 
 
