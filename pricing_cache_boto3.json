@@ -8,7 +8,7 @@
     },
     "RDS_db.t3.micro_us-east-1_MySQL": {
       "price": 0.017,
-      "timestamp": "2026-06-09T13:58:24.156239",
+      "timestamp": "2026-06-10T15:42:49.999535",
       "instance_type": "db.t3.micro",
       "region": "us-east-1"
     },
@@ -45,7 +45,7 @@
     },
     "EC2_t3.medium_us-east-1_Linux": {
       "price": 0.0416,
-      "timestamp": "2026-06-09T14:21:14.520299",
+      "timestamp": "2026-06-10T15:42:49.382101",
       "instance_type": "t3.medium",
       "region": "us-east-1"
     },
@@ -56,5 +56,5 @@
       "region": "us-west-2"
     }
   },
-  "last_updated": "2026-06-09T14:21:22.166215"
+  "last_updated": "2026-06-10T15:42:49.999535"
 }

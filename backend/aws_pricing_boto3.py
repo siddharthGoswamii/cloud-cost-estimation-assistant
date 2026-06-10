@@ -220,42 +220,66 @@ class AWSPricingBoto3:
             if datetime.now() - cache_time < self.cache_duration:
                 return cached_data['price']
         
+        region_name = self._get_region_code(region)
+        
+        # Map region to usagetype prefix
+        region_prefix_map = {
+            "us-east-1": "",           # N. Virginia has no prefix
+            "us-east-2": "USE2-",
+            "us-west-1": "USW1-",
+            "us-west-2": "USW2-",
+            "eu-west-1": "EU-",
+            "ap-south-1": "APS3-",
+            "ap-northeast-1": "APN1-",
+            "ap-southeast-1": "APS1-",
+            "ap-southeast-2": "APS2-",
+        }
+        prefix = region_prefix_map.get(region, "")
+        
         try:
-            region_name = self._get_region_code(region)
-            
-            # Get request pricing
+            # Fetch request pricing
             response = self.pricing_client.get_products(
                 ServiceCode='AWSLambda',
                 Filters=[
                     {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': region_name},
-                    {'Type': 'TERM_MATCH', 'Field': 'group', 'Value': 'AWS-Lambda-Requests'},
+                    {'Type': 'TERM_MATCH', 'Field': 'usagetype',
+                     'Value': f'{prefix}Lambda-Request-Tier1'},
                 ],
                 MaxResults=1
             )
             
-            request_price = 0.20  # Default
+            request_price = 0.20  # fallback
             if response['PriceList']:
                 price_item = json.loads(response['PriceList'][0])
                 on_demand = price_item['terms']['OnDemand']
                 price_dimensions = list(on_demand.values())[0]['priceDimensions']
-                request_price = float(list(price_dimensions.values())[0]['pricePerUnit']['USD'])
+                # Price is per request, convert to per million
+                per_request = float(list(price_dimensions.values())[0]['pricePerUnit']['USD'])
+                request_price = per_request * 1_000_000
+                print(f"  [OK] Live Lambda request price: ${request_price}/M requests")
+            else:
+                print(f"  [WARN] Lambda request pricing not found, using default ${request_price}/M")
             
-            # Get compute pricing (GB-second)
+            # Fetch GB-second pricing
             response = self.pricing_client.get_products(
                 ServiceCode='AWSLambda',
                 Filters=[
                     {'Type': 'TERM_MATCH', 'Field': 'location', 'Value': region_name},
-                    {'Type': 'TERM_MATCH', 'Field': 'group', 'Value': 'AWS-Lambda-Duration'},
+                    {'Type': 'TERM_MATCH', 'Field': 'usagetype',
+                     'Value': f'{prefix}Lambda-GB-Second'},
                 ],
                 MaxResults=1
             )
             
-            gb_second_price = 0.0000166667  # Default
+            gb_second_price = 0.0000166667  # fallback
             if response['PriceList']:
                 price_item = json.loads(response['PriceList'][0])
                 on_demand = price_item['terms']['OnDemand']
                 price_dimensions = list(on_demand.values())[0]['priceDimensions']
                 gb_second_price = float(list(price_dimensions.values())[0]['pricePerUnit']['USD'])
+                print(f"  [OK] Live Lambda GB-second price: ${gb_second_price}/GB-sec")
+            else:
+                print(f"  [WARN] Lambda GB-second pricing not found, using default ${gb_second_price}")
             
             pricing = {
                 "requestCostPerMillion": request_price,
@@ -267,17 +291,11 @@ class AWSPricingBoto3:
                 'timestamp': datetime.now().isoformat()
             }
             self.save_cache()
-            
-            print(f"[OK] Fetched Lambda pricing in {region}: ${request_price}/M requests, ${gb_second_price}/GB-second")
             return pricing
             
         except Exception as e:
-            print(f"[ERROR] Error fetching Lambda pricing: {e}")
-            # Return default pricing
-            return {
-                "requestCostPerMillion": 0.20,
-                "gbSecondCost": 0.0000166667
-            }
+            print(f"  [ERROR] Error fetching Lambda pricing: {e}")
+            return {"requestCostPerMillion": 0.20, "gbSecondCost": 0.0000166667}
     
     def fetch_all_prices(self, region: str = "us-east-1"):
         """
