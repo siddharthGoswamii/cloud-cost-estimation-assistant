@@ -133,25 +133,54 @@ class ConversationalCostAgent:
     
     def detect_trigger(self, user_input: str, session: SessionState) -> str:
         """Detect which trigger pattern the user input matches"""
-        user_input_lower = user_input.lower()
+        user_input_lower = user_input.lower().strip()
         
-        # Trigger 2: Assumptions query
+        # TRIGGER 2: Must explicitly ask about assumptions for a known service
+        # Require: "assumption" + a service name already in session
         if any(word in user_input_lower for word in ["assumption", "assume", "why did you"]):
-            return "TRIGGER_2_ASSUMPTIONS"
+            if session.services:  # Only route to T2 if we have services already
+                service_names = [s.name.lower() for s in session.services]
+                if any(svc in user_input_lower for svc in service_names):
+                    return "TRIGGER_2_ASSUMPTIONS"
+            return "TRIGGER_2_ASSUMPTIONS" if "assumption" in user_input_lower else "TRIGGER_1_INITIAL"
         
-        # Trigger 3: Update configuration
-        if any(word in user_input_lower for word in ["update", "change", "modify", "set", "increase", "decrease"]):
+        # TRIGGER 3: Must have existing services AND explicit update intent
+        # Require: update keywords + a service name OR a config parameter name
+        update_intent_phrases = [
+            "update the", "change the", "modify the", "change it to",
+            "update it to", "increase the", "decrease the", "reduce the",
+            "set it to", "instead of", "switch to", "upgrade to", "downgrade to"
+        ]
+        config_param_words = ["dtu", "instance", "storage", "gb", "tb", "hours",
+                              "requests", "memory", "count", "quantity", "tier", "sku"]
+        
+        has_update_phrase = any(phrase in user_input_lower for phrase in update_intent_phrases)
+        has_config_param = any(param in user_input_lower for param in config_param_words)
+        has_existing_services = len(session.services) > 0
+        
+        if has_update_phrase and has_existing_services and has_config_param:
             return "TRIGGER_3_UPDATE"
         
-        # Trigger 4: Total cost / recalculate
-        if any(phrase in user_input_lower for phrase in ["total cost", "recalculate", "summary", "breakdown", "show all"]):
-            return "TRIGGER_4_TOTAL"
+        # TRIGGER 4: Explicit summary/total request — must be short and direct
+        # A long message with "summary" in it is likely still an architecture description
+        total_phrases = ["total cost", "show total", "final cost", "overall cost",
+                         "show all costs", "cost summary", "recalculate all",
+                         "what's the total", "what is the total"]
+        if any(phrase in user_input_lower for phrase in total_phrases):
+            if len(user_input_lower.split()) < 20:  # Short messages only
+                return "TRIGGER_4_TOTAL"
         
-        # Trigger 5: What-if analysis
-        if any(phrase in user_input_lower for phrase in ["what if", "optimize", "cheaper", "reduce cost", "alternative"]):
+        # TRIGGER 5: What-if analysis — must start with "what if" or "what would"
+        if user_input_lower.startswith(("what if", "what would", "if i")):
             return "TRIGGER_5_WHATIF"
         
-        # Trigger 1: Initial architecture (default)
+        # Additional check: if optimize/cheaper used alone (not in an architecture desc)
+        if any(phrase in user_input_lower for phrase in ["optimize costs", "reduce costs",
+                                                           "make it cheaper", "cost optimization"]):
+            if len(user_input_lower.split()) < 15:
+                return "TRIGGER_5_WHATIF"
+        
+        # Default: treat as new architecture description
         return "TRIGGER_1_INITIAL"
     
     def parse_architecture_description(self, description: str, session: SessionState) -> List[ServiceConfig]:
@@ -190,11 +219,12 @@ class ConversationalCostAgent:
         elif any(word in description.lower() for word in ["small", "dev", "test", "development"]):
             session.scale = "Small"
         
-        # Split description into sentences for better service detection
-        sentences = re.split(r'[.;]|\n', description)
-        
         # Service detection patterns
         service_patterns = self._get_service_patterns(session.cloud_provider)
+        
+        # For better context, use sentence-based splitting instead of just commas
+        # This preserves more context for each service
+        sentences = re.split(r'\.\s+', description)
         
         print(f"\n[DEBUG] Service Detection:")
         print(f"  Description length: {len(description)} chars")
@@ -204,30 +234,35 @@ class ConversationalCostAgent:
         # Track which services we've already found to avoid duplicates
         found_services = set()
         
-        for i, sentence in enumerate(sentences):
-            sentence = sentence.strip()
-            if not sentence:
+        for service_name, pattern in service_patterns.items():
+            if service_name in found_services:
                 continue
             
-            print(f"\n  Sentence {i+1}: '{sentence[:100]}...'")
-                
-            for service_name, pattern in service_patterns.items():
-                # Skip if we already found this service
-                if service_name in found_services:
-                    continue
-                    
-                match = re.search(pattern, sentence, re.IGNORECASE)
-                if match:
-                    print(f"    [MATCH] {service_name} detected!")
-                    service_id += 1
-                    config = self._extract_service_config(
-                        service_name,
-                        sentence,  # Pass the whole sentence for better context
-                        session,
-                        f"svc_{service_id}"
-                    )
-                    services.append(config)
-                    found_services.add(service_name)
+            # Find the sentence(s) most relevant to this service
+            # Collect all sentences that mention this service for better context
+            relevant_text = []
+            for sentence in sentences:
+                if re.search(pattern, sentence, re.IGNORECASE):
+                    relevant_text.append(sentence)
+            
+            if not relevant_text:
+                # Try full description as fallback
+                if re.search(pattern, description, re.IGNORECASE):
+                    relevant_text = [description]
+            
+            if relevant_text:
+                # Join relevant sentences to get full context
+                best_chunk = '. '.join(relevant_text)
+                service_id += 1
+                config = self._extract_service_config(
+                    service_name,
+                    best_chunk,  # Pass the relevant context
+                    session,
+                    f"svc_{service_id}"
+                )
+                services.append(config)
+                found_services.add(service_name)
+                print(f"  [MATCH] {service_name} detected in context: '{best_chunk[:100]}'")
         
         print(f"\n[DEBUG] Total services detected: {len(services)}")
         print(f"  Services: {[s.name for s in services]}\n")
@@ -238,14 +273,15 @@ class ConversationalCostAgent:
         """Get regex patterns for service detection - more flexible patterns"""
         if cloud_provider == "AWS":
             return {
-                "EC2": r"(?:EC2|instances?|servers?|virtual machines?|VMs?)\b",
-                "RDS": r"(?:RDS|database|DB|MySQL|PostgreSQL|MariaDB|Oracle|SQL Server|Aurora|db\.)",
-                "S3": r"(?:S3|bucket|object storage|blob storage)\b",
+                "EC2": r"(?:EC2|compute nodes?|instances?|servers?|virtual machines?|VMs?|c\d+i\.)",
+                "RDS": r"(?:RDS|database|DB|MySQL|PostgreSQL|MariaDB|Oracle|SQL Server|Aurora|db\.m\d+g\.|db\.t\d+\.|db\.r\d+\.)",
+                "S3": r"(?:S3|bucket|object storage|blob storage|standard bucket)\b",
+                "Glacier": r"(?:Glacier|S3 Glacier|archive|cold storage)\b",
                 "Lambda": r"(?:Lambda|serverless functions?|function invocations?)\b",
                 "DynamoDB": r"(?:DynamoDB|NoSQL|document database)\b",
                 "CloudFront": r"(?:CloudFront|CDN|content delivery)\b",
                 "ELB": r"(?:Load Balancer|ELB|ALB|NLB|Application Load Balancer|Network Load Balancer)\b",
-                "ElastiCache": r"(?:ElastiCache|Redis|Memcached|cache cluster)\b",
+                "ElastiCache": r"(?:ElastiCache|Redis|Memcached|cache cluster|cache\.m\d+g\.)",
                 "API Gateway": r"(?:API Gateway|REST API|HTTP API|WebSocket API)\b",
                 "Kinesis": r"(?:Kinesis|data stream|streaming data)\b",
                 "SNS": r"(?:SNS|Simple Notification|notification service|pub.?sub)\b",
@@ -273,7 +309,7 @@ class ConversationalCostAgent:
             default_instance_type = "cache.t3.micro"
         elif service_name == "RDS":
             default_instance_type = "db.t3.micro"
-        elif service_name in ["S3", "CloudFront", "SNS", "SQS", "NAT Gateway", "ELB", "DynamoDB", "Lambda", "API Gateway"]:
+        elif service_name in ["S3", "Glacier", "CloudFront", "SNS", "SQS", "NAT Gateway", "ELB", "DynamoDB", "Lambda", "API Gateway"]:
             default_instance_type = "N/A"  # These services don't use instance types
         
         # Extract quantity - IMPROVED: Look for number BEFORE service name
@@ -299,11 +335,23 @@ class ConversationalCostAgent:
             additional_params={"region": session.region}
         )
         
-        # Extract instance type - IMPROVED: More comprehensive patterns
-        instance_match = re.search(
-            r'(t[23]\.\w+|m[456]\.\w+|c[456]\.\w+|r[456]\.\w+|db\.\w+|cache\.\w+)',
-            match_text, re.IGNORECASE
-        )
+        # Extract instance type - SERVICE-SPECIFIC patterns to avoid cross-contamination
+        instance_match = None
+        if service_name == "RDS":
+            # Only match db.* instance types for RDS
+            instance_match = re.search(r'(db\.[a-z0-9]+\.\w+)', match_text, re.IGNORECASE)
+        elif service_name == "ElastiCache":
+            # Only match cache.* instance types for ElastiCache
+            instance_match = re.search(r'(cache\.[a-z0-9]+\.\w+)', match_text, re.IGNORECASE)
+        elif service_name == "EC2":
+            # Only match EC2 instance types (not db.* or cache.*)
+            instance_match = re.search(r'(t[23]\.\w+|m[456g]\.\w+|c[456]i?\.\w+|r[456]\.\w+)(?!\.)', match_text, re.IGNORECASE)
+        else:
+            # General pattern for other services
+            instance_match = re.search(
+                r'(t[23]\.\w+|m[456g]\.\w+|c[456]i?\.\w+|r[456]\.\w+)',
+                match_text, re.IGNORECASE
+            )
         if instance_match:
             config.instance_type = instance_match.group(0).lower()
             config.assumptions.append(f"Instance type explicitly specified: {config.instance_type}")
@@ -312,24 +360,80 @@ class ConversationalCostAgent:
                 config.assumptions.append(f"[ASSUMPTION] Instance type: {config.instance_type} (default for {session.scale} scale)")
         
         # Extract storage - IMPROVED: Better patterns for various formats
-        storage_match = re.search(
-            r'(\d+(?:\.\d+)?)\s*(TB|GB)(?:\s+(?:of\s+)?(?:storage|store|disk|volume|bucket|capacity|data))?',
-            match_text, re.IGNORECASE
-        )
-        # Also try: "storage of 100GB" or "with 2TB storage"
-        if not storage_match:
+        # For S3 and Glacier, look for storage amounts in the specific context
+        if service_name == "S3":
+            # For S3: look for "holding XTB" or "XTB of data" (but not "for cold/archive")
+            storage_patterns = [
+                r'holding\s+(\d+(?:\.\d+)?)\s*(TB|GB)\s+of\s+data',  # "holding 31TB of data"
+                r'(\d+(?:\.\d+)?)\s*(TB|GB)\s+of\s+data(?!\s*,\s*while)',  # "31TB of data"
+            ]
+            
+            for pattern in storage_patterns:
+                storage_match = re.search(pattern, match_text, re.IGNORECASE)
+                if storage_match:
+                    storage_value = float(storage_match.group(1))
+                    storage_unit = storage_match.group(2).upper()
+                    config.storage_gb = storage_value * 1000 if storage_unit == "TB" else storage_value
+                    config.assumptions.append(f"Storage explicitly specified: {config.storage_gb}GB")
+                    break
+        elif service_name == "Glacier":
+            # For Glacier: look for "XTB for cold/archive" or "with XTB for"
+            storage_patterns = [
+                r'with\s+(\d+(?:\.\d+)?)\s*(TB|GB)\s+for',  # "with 10TB for"
+                r'(\d+(?:\.\d+)?)\s*(TB|GB)\s+for\s+(?:cold|archive|backup)',  # "10TB for cold"
+            ]
+            
+            for pattern in storage_patterns:
+                storage_match = re.search(pattern, match_text, re.IGNORECASE)
+                if storage_match:
+                    storage_value = float(storage_match.group(1))
+                    storage_unit = storage_match.group(2).upper()
+                    config.storage_gb = storage_value * 1000 if storage_unit == "TB" else storage_value
+                    config.assumptions.append(f"Storage explicitly specified: {config.storage_gb}GB")
+                    break
+            
+            # For Glacier, detect storage class
+            if service_name == "Glacier":
+                if "flexible" in match_text.lower():
+                    config.additional_params["storageClass"] = "flexible"
+                elif "instant" in match_text.lower():
+                    config.additional_params["storageClass"] = "instant"
+                elif "deep" in match_text.lower():
+                    config.additional_params["storageClass"] = "deep"
+                else:
+                    config.additional_params["storageClass"] = "flexible"  # Default
+                config.assumptions.append(f"Glacier storage class: {config.additional_params['storageClass']}")
+        elif service_name == "RDS":
+            # For RDS, look for storage with gp2/gp3/io1 context
             storage_match = re.search(
-                r'(?:with|of|has)\s+(\d+(?:\.\d+)?)\s*(TB|GB)\s+(?:storage|store|disk|volume|capacity|data)',
+                r'(\d+(?:\.\d+)?)\s*(TB|GB)\s+(?:gp[23]|io[12]|standard)',
                 match_text, re.IGNORECASE
             )
-        
-        if storage_match:
-            storage_value = float(storage_match.group(1))
-            storage_unit = storage_match.group(2).upper()
-            config.storage_gb = storage_value * 1000 if storage_unit == "TB" else storage_value
-            config.assumptions.append(f"Storage explicitly specified: {config.storage_gb}GB")
-        elif "storage" in defaults and service_name in ["RDS", "S3"]:
-            config.assumptions.append(f"[ASSUMPTION] Storage: {defaults['storage']} (default)")
+            if storage_match:
+                storage_value = float(storage_match.group(1))
+                storage_unit = storage_match.group(2).upper()
+                config.storage_gb = storage_value * 1000 if storage_unit == "TB" else storage_value
+                config.assumptions.append(f"Storage explicitly specified: {config.storage_gb}GB")
+            elif "storage" in defaults:
+                config.assumptions.append(f"[ASSUMPTION] Storage: {defaults['storage']} (default)")
+        else:
+            # For other services (EBS, etc.)
+            storage_match = re.search(
+                r'(\d+(?:\.\d+)?)\s*(TB|GB)(?:\s+(?:of\s+)?(?:storage|store|disk|volume|capacity))?',
+                match_text, re.IGNORECASE
+            )
+            # Also try: "storage of 100GB" or "with 2TB storage"
+            if not storage_match:
+                storage_match = re.search(
+                    r'(?:with|of|has)\s+(\d+(?:\.\d+)?)\s*(TB|GB)\s+(?:storage|store|disk|volume|capacity|data)',
+                    match_text, re.IGNORECASE
+                )
+            
+            if storage_match:
+                storage_value = float(storage_match.group(1))
+                storage_unit = storage_match.group(2).upper()
+                config.storage_gb = storage_value * 1000 if storage_unit == "TB" else storage_value
+                config.assumptions.append(f"Storage explicitly specified: {config.storage_gb}GB")
         
         # Extract hours if present
         hours_match = re.search(r'(\d+)\s*hours?', match_text, re.IGNORECASE)
@@ -448,10 +552,11 @@ class ConversationalCostAgent:
                 config.setdefault("count", service.quantity)
                 
                 # FIX 1B: Storage - always include, never let it be missing
-                if service.storage_gb is not None:
+                if service.storage_gb is not None and service.storage_gb > 0:
                     config["storageGB"] = service.storage_gb
                     config["usageGB"] = service.storage_gb  # Some services use usageGB key
-                else:
+                elif service.name not in ["EC2", "Lambda", "API Gateway", "SNS", "SQS", "CloudFront", "NAT Gateway", "ELB"]:
+                    # Only set default 0 for services that don't typically use storage
                     config.setdefault("storageGB", 0)
                     config.setdefault("usageGB", 0)
                 
@@ -612,20 +717,102 @@ class ConversationalCostAgent:
     def _handle_update_trigger(self, user_message: str, session: SessionState) -> str:
         """Handle configuration update requests"""
         if not session.services:
-            return "[ERROR] No services detected yet. Please describe your architecture first."
+            return "No services detected yet. Please describe your architecture first."
         
-        # This is likely a new architecture description, not an update
-        # Treat it as TRIGGER_1
-        services = self.parse_architecture_description(user_message, session)
-        if services:
-            session.services = services
-            for service in session.services:
-                self.calculate_service_cost(service, session)
-            session.total_monthly_cost = sum(s.monthly_cost for s in session.services)
-            session.total_annual_cost = session.total_monthly_cost * 12
-            return self.format_trigger1_response(session)
+        user_lower = user_message.lower()
         
-        return "I couldn't detect any services in your message. Please describe your cloud architecture with specific details."
+        # Step 1: Find which service the user wants to update
+        target_service = None
+        for service in session.services:
+            if service.name.lower() in user_lower:
+                target_service = service
+                break
+        
+        if not target_service:
+            # Could not identify target service — ask for clarification
+            service_list = ", ".join([s.name for s in session.services])
+            return (f"Which service would you like to update? "
+                    f"Current services: {service_list}")
+        
+        # Step 2: Extract the new parameter values from the message
+        old_cost = target_service.monthly_cost
+        
+        # Update quantity
+        qty_match = re.search(r'(\d+)\s*(?:instances?|nodes?|servers?|replicas?)',
+                               user_lower)
+        if qty_match:
+            target_service.quantity = int(qty_match.group(1))
+        
+        # Update instance type
+        instance_match = re.search(
+            r'(t[23]\.\w+|m[456]\.\w+|c[456]\.\w+|r[456]\.\w+|db\.\w+|cache\.\w+)',
+            user_lower)
+        if instance_match:
+            target_service.instance_type = instance_match.group(1)
+        
+        # Update storage
+        storage_match = re.search(r'(\d+(?:\.\d+)?)\s*(TB|GB)\s*(?:storage|disk)?',
+                                   user_lower, re.IGNORECASE)
+        if storage_match:
+            val = float(storage_match.group(1))
+            unit = storage_match.group(2).upper()
+            target_service.storage_gb = val * 1000 if unit == "TB" else val
+            target_service.additional_params["storageGB"] = target_service.storage_gb
+        
+        # Update hours/usage
+        hours_match = re.search(r'(\d+)\s*hours?\s*(?:per\s*day|a\s*day|/day)?',
+                                 user_lower)
+        if hours_match:
+            hrs = int(hours_match.group(1))
+            # If "per day" context or value <= 24, treat as hours/day
+            if hrs <= 24:
+                target_service.hours_per_day = float(hrs)
+            else:
+                # Treat as hours/month
+                target_service.hours_per_day = hrs / 30
+        
+        # Update requests for Lambda/API Gateway/DynamoDB
+        req_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:million|M)\s*(?:requests?|invocations?)',
+                               user_lower, re.IGNORECASE)
+        if req_match:
+            target_service.additional_params["requests"] = int(
+                float(req_match.group(1)) * 1_000_000
+            )
+        
+        # Step 3: Recalculate ONLY the updated service
+        self.calculate_service_cost(target_service, session)
+        new_cost = target_service.monthly_cost
+        
+        # Step 4: Update session totals
+        session.total_monthly_cost = sum(s.monthly_cost for s in session.services)
+        session.total_annual_cost = session.total_monthly_cost * 12
+        session.last_updated_service = target_service.name
+        
+        # Step 5: Format response showing only the change
+        diff = new_cost - old_cost
+        diff_sign = "+" if diff >= 0 else ""
+        
+        return f"""---
+## ✏️ Updated: {target_service.name}
+
+| Parameter     | New Value              |
+|---------------|------------------------|
+| Instance Type | {target_service.instance_type} |
+| Quantity      | {target_service.quantity} |
+| Storage       | {f"{target_service.storage_gb}GB" if target_service.storage_gb else "N/A"} |
+| Hours/Month   | {int(target_service.hours_per_day * target_service.days_per_month)}h |
+
+| Cost          | Amount                 |
+|---------------|------------------------|
+| Previous Cost | ${old_cost:.2f}/month  |
+| New Cost      | ${new_cost:.2f}/month  |
+| Difference    | {diff_sign}${diff:.2f}/month |
+
+**Updated Total: ${session.total_monthly_cost:.2f}/month**
+
+> All other services remain unchanged.
+💬 Want the full updated cost summary?
+---"""
     
     def _handle_total_trigger(self, session: SessionState) -> str:
         """Handle total cost summary requests"""
