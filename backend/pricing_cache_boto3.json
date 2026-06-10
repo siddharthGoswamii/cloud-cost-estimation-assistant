@@ -61,7 +61,97 @@
       "timestamp": "2026-06-10T15:54:36.786435",
       "instance_type": "t3.medium",
       "region": "us-east-1"
+    },
+    "EC2_t3.micro_us-east-1_Linux": {
+      "price": 0.0104,
+      "timestamp": "2026-06-10T17:07:40.054302",
+      "instance_type": "t3.micro",
+      "region": "us-east-1"
+    },
+    "EC2_t3.small_us-east-1_Linux": {
+      "price": 0.0208,
+      "timestamp": "2026-06-10T17:07:40.354381",
+      "instance_type": "t3.small",
+      "region": "us-east-1"
+    },
+    "EC2_t3.xlarge_us-east-1_Linux": {
+      "price": 0.1664,
+      "timestamp": "2026-06-10T17:07:40.650487",
+      "instance_type": "t3.xlarge",
+      "region": "us-east-1"
+    },
+    "EC2_m5.large_us-east-1_Linux": {
+      "price": 0.096,
+      "timestamp": "2026-06-10T17:07:40.960177",
+      "instance_type": "m5.large",
+      "region": "us-east-1"
+    },
+    "EC2_m5.xlarge_us-east-1_Linux": {
+      "price": 0.192,
+      "timestamp": "2026-06-10T17:07:41.279461",
+      "instance_type": "m5.xlarge",
+      "region": "us-east-1"
+    },
+    "EC2_m5.2xlarge_us-east-1_Linux": {
+      "price": 0.384,
+      "timestamp": "2026-06-10T17:07:41.590029",
+      "instance_type": "m5.2xlarge",
+      "region": "us-east-1"
+    },
+    "EC2_c5.large_us-east-1_Linux": {
+      "price": 0.085,
+      "timestamp": "2026-06-10T17:07:41.897074",
+      "instance_type": "c5.large",
+      "region": "us-east-1"
+    },
+    "EC2_c5.xlarge_us-east-1_Linux": {
+      "price": 0.17,
+      "timestamp": "2026-06-10T17:07:42.211438",
+      "instance_type": "c5.xlarge",
+      "region": "us-east-1"
+    },
+    "EC2_r5.large_us-east-1_Linux": {
+      "price": 0.126,
+      "timestamp": "2026-06-10T17:07:42.506042",
+      "instance_type": "r5.large",
+      "region": "us-east-1"
+    },
+    "EC2_r5.xlarge_us-east-1_Linux": {
+      "price": 0.252,
+      "timestamp": "2026-06-10T17:07:42.808013",
+      "instance_type": "r5.xlarge",
+      "region": "us-east-1"
+    },
+    "RDS_db.t3.small_us-east-1_MySQL": {
+      "price": 0.034,
+      "timestamp": "2026-06-10T17:07:43.123699",
+      "instance_type": "db.t3.small",
+      "region": "us-east-1"
+    },
+    "RDS_db.t3.medium_us-east-1_MySQL": {
+      "price": 0.068,
+      "timestamp": "2026-06-10T17:07:43.431217",
+      "instance_type": "db.t3.medium",
+      "region": "us-east-1"
+    },
+    "RDS_db.r5.large_us-east-1_MySQL": {
+      "price": 0.24,
+      "timestamp": "2026-06-10T17:07:43.733951",
+      "instance_type": "db.r5.large",
+      "region": "us-east-1"
+    },
+    "RDS_db.r5.xlarge_us-east-1_MySQL": {
+      "price": 0.48,
+      "timestamp": "2026-06-10T17:07:44.051679",
+      "instance_type": "db.r5.xlarge",
+      "region": "us-east-1"
+    },
+    "RDS_db.m5.large_us-east-1_MySQL": {
+      "price": 0.171,
+      "timestamp": "2026-06-10T17:07:44.775218",
+      "instance_type": "db.m5.large",
+      "region": "us-east-1"
     }
   },
-  "last_updated": "2026-06-10T15:54:36.787442"
+  "last_updated": "2026-06-10T17:07:44.781158"
 }

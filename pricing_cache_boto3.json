@@ -17,11 +17,11 @@
         "requestCostPerMillion": 2e-07,
         "gbSecondCost": 1.5e-05
       },
-      "timestamp": "2026-06-09T13:58:24.650267"
+      "timestamp": "2026-06-10T17:02:28.001297"
     },
     "RDS_db.t3.micro_us-west-2_MySQL": {
       "price": 0.017,
-      "timestamp": "2026-06-09T14:02:00.169209",
+      "timestamp": "2026-06-10T17:02:38.264842",
       "instance_type": "db.t3.micro",
       "region": "us-west-2"
     },
@@ -51,10 +51,10 @@
     },
     "EC2_t3.medium_us-west-2_Linux": {
       "price": 0.0416,
-      "timestamp": "2026-06-09T14:21:22.163713",
+      "timestamp": "2026-06-10T17:02:37.966417",
       "instance_type": "t3.medium",
       "region": "us-west-2"
     }
   },
-  "last_updated": "2026-06-10T15:42:49.999535"
+  "last_updated": "2026-06-10T17:02:38.268852"
 }

@@ -1,0 +1,32 @@
+{
+  "region": "us-east-1",
+  "timestamp": "2026-06-10T12:30:20.539266",
+  "ec2_prices": {
+    "t3.micro": 0.0104,
+    "t3.small": 0.0208,
+    "t3.medium": 0.0416,
+    "t3.large": 0.0832,
+    "t3.xlarge": 0.1664,
+    "m5.large": 0.096,
+    "m5.xlarge": 0.192,
+    "m5.2xlarge": 0.384,
+    "c5.large": 0.085,
+    "c5.xlarge": 0.17,
+    "r5.large": 0.126,
+    "r5.xlarge": 0.252
+  },
+  "rds_prices": {
+    "db.t3.micro": 0.017,
+    "db.t3.small": 0.034,
+    "db.t3.medium": 0.068,
+    "db.t3.large": 0.136,
+    "db.r5.large": 0.24,
+    "db.r5.xlarge": 0.48,
+    "db.m5.large": 0.171
+  },
+  "lambda_pricing": {
+    "requestCostPerMillion": 0.2,
+    "gbSecondCost": 1.5e-05
+  },
+  "total_cached": 25
+}
