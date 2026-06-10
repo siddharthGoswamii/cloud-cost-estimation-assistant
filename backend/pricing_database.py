@@ -47,8 +47,13 @@ PRICING_DB = {
                 "m5.2xlarge": 0.384,
                 "c5.large": 0.085,
                 "c5.xlarge": 0.17,
+                "c5.2xlarge": 0.34,
+                "c6i.large": 0.085,
+                "c6i.xlarge": 0.17,
+                "c6i.2xlarge": 0.34,
                 "r5.large": 0.126,
-                "r5.xlarge": 0.252
+                "r5.xlarge": 0.252,
+                "r5.2xlarge": 0.504
             }
         }
     },
@@ -158,10 +163,16 @@ PRICING_DB = {
             "db.t3.small": 0.034,
             "db.t3.medium": 0.068,
             "db.t3.large": 0.136,
+            "db.t3.xlarge": 0.272,
             "db.m5.large": 0.192,
             "db.m5.xlarge": 0.384,
+            "db.m5.2xlarge": 0.768,
+            "db.m6g.large": 0.182,
+            "db.m6g.xlarge": 0.364,
+            "db.m6g.2xlarge": 0.728,
             "db.r5.large": 0.24,
-            "db.r5.xlarge": 0.48
+            "db.r5.xlarge": 0.48,
+            "db.r5.2xlarge": 0.96
         },
         "storagePerGB": 0.115,
         "iopsPerMonth": 0.10
@@ -204,8 +215,13 @@ PRICING_DB = {
         "instanceRates": {
             "cache.t3.micro": 0.017,
             "cache.t3.small": 0.034,
+            "cache.t3.medium": 0.068,
             "cache.m5.large": 0.170,
-            "cache.r5.large": 0.226
+            "cache.m5.xlarge": 0.340,
+            "cache.m6g.large": 0.161,
+            "cache.m6g.xlarge": 0.322,
+            "cache.r5.large": 0.226,
+            "cache.r5.xlarge": 0.452
         }
     },
     

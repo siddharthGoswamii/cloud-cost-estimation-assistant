@@ -1,0 +1,61 @@
+{
+  "prices": {
+    "EC2_t3.large_us-east-1_Linux": {
+      "price": 0.0832,
+      "timestamp": "2026-06-10T12:30:20.539266",
+      "instance_type": "t3.large",
+      "region": "us-east-1"
+    },
+    "RDS_db.t3.micro_us-east-1_MySQL": {
+      "price": 0.017,
+      "timestamp": "2026-06-10T12:30:26.449207",
+      "instance_type": "db.t3.micro",
+      "region": "us-east-1"
+    },
+    "Lambda_us-east-1": {
+      "price": {
+        "requestCostPerMillion": 0.2,
+        "gbSecondCost": 1.5e-05
+      },
+      "timestamp": "2026-06-10T12:30:27.102509"
+    },
+    "EC2_m5.large_us-west-2_Linux": {
+      "price": 0.096,
+      "timestamp": "2026-06-10T12:30:33.718892",
+      "instance_type": "m5.large",
+      "region": "us-west-2"
+    },
+    "RDS_db.t3.large_us-east-1_MySQL": {
+      "price": 0.136,
+      "timestamp": "2026-06-10T12:31:08.227808",
+      "instance_type": "db.t3.large",
+      "region": "us-east-1"
+    },
+    "Lambda_ap-south-1": {
+      "price": {
+        "requestCostPerMillion": 0.2,
+        "gbSecondCost": 1.66667e-05
+      },
+      "timestamp": "2026-06-10T12:33:28.129483"
+    },
+    "EC2_c6i.xlarge_us-east-1_Linux": {
+      "price": 0.17,
+      "timestamp": "2026-06-10T15:46:38.247256",
+      "instance_type": "c6i.xlarge",
+      "region": "us-east-1"
+    },
+    "RDS_db.m6g.xlarge_us-east-1_MySQL": {
+      "price": 0.304,
+      "timestamp": "2026-06-10T15:46:38.585637",
+      "instance_type": "db.m6g.xlarge",
+      "region": "us-east-1"
+    },
+    "RDS_db.r5.large_us-west-2_MySQL": {
+      "price": 0.24,
+      "timestamp": "2026-06-10T15:46:53.697364",
+      "instance_type": "db.r5.large",
+      "region": "us-west-2"
+    }
+  },
+  "last_updated": "2026-06-10T15:46:53.699475"
+}

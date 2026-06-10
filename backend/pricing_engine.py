@@ -47,7 +47,7 @@ class PricingEngine:
         """Get pricing multiplier for a specific region"""
         return self.region_db.get(region, {}).get("multiplier", 1.0)
     
-    def get_service_info(self, service: str) -> Optional[Dict]:
+    def get_service_info(self, service: str, region: str = "us-east-1") -> Optional[Dict]:
         """
         Get service configuration from database
         If AWS Pricing API is available, merge live prices with static config
@@ -56,11 +56,11 @@ class PricingEngine:
         
         # If AWS Pricing API is available, try to get live prices
         if self.aws_pricing and service_data:
-            service_data = self._enrich_with_live_prices(service, service_data)
+            service_data = self._enrich_with_live_prices(service, service_data, region)
         
         return service_data
     
-    def _enrich_with_live_prices(self, service: str, service_data: Dict) -> Dict:
+    def _enrich_with_live_prices(self, service: str, service_data: Dict, region: str = "us-east-1") -> Dict:
         """Enrich service data with live AWS prices"""
         try:
             # Make a copy to avoid modifying the original
@@ -79,7 +79,6 @@ class PricingEngine:
             elif service == "Lambda":
                 # Get live Lambda prices
                 print(f"  [FETCH] Fetching live Lambda prices...")
-                region = "us-east-1"  # Default, will be overridden in calculate
                 lambda_pricing = self.aws_pricing.get_lambda_pricing(region)
                 if lambda_pricing:
                     enriched_data["requestCostPerMillion"] = lambda_pricing["requestCostPerMillion"]
@@ -103,11 +102,13 @@ class PricingEngine:
         Returns:
             Dict with cost breakdown and total
         """
-        service_data = self.get_service_info(service)
+        # Extract region FIRST before getting service info
+        region = config.get("region", "us-east-1")
+        
+        # Pass region to get_service_info so live pricing uses correct region
+        service_data = self.get_service_info(service, region=region)
         if not service_data:
             raise ValueError(f"Service '{service}' not found in pricing database")
-        
-        region = config.get("region", "us-east-1")
         region_multiplier = self.get_region_multiplier(region)
         
         model = service_data["model"]
@@ -309,7 +310,7 @@ class PricingEngine:
         return cost, breakdown
     
     def _calculate_tiered(self, service_data: Dict, config: Dict) -> tuple:
-        """Calculate tiered storage pricing (S3, EBS, EFS)"""
+        """Calculate tiered storage pricing (S3, EBS, EFS, Glacier)"""
         usage_gb = config.get("usageGB", config.get("storageGB", 0))
         
         # BUG FIX: Ensure user-provided storage is never overwritten with 0
@@ -317,22 +318,45 @@ class PricingEngine:
             print(f"  [WARN] WARNING: Storage was 0 but user specified storage in config")
         
         if "tiers" in service_data:
-            # S3-style tiered pricing with free tier
-            free_tier = service_data.get("freeTier", {})
-            free_storage = free_tier.get("storageGB", 0)
-            
-            # Apply free tier BEFORE calculating
-            billable_gb = max(0, usage_gb - free_storage)
-            cost = self._calculate_tier_cost(service_data["tiers"], billable_gb)
-            
-            print(f"  [S3_TIERED] usage={usage_gb}GB | free_tier={free_storage}GB | billable={billable_gb}GB | cost=${cost:.4f}")
-            
-            breakdown = {
-                "usageGB": usage_gb,
-                "freeGB": free_storage,
-                "billableGB": billable_gb,
-                "model": "tiered"
-            }
+            # Check if this is Glacier (has storage class in tiers)
+            if any("class" in tier for tier in service_data["tiers"]):
+                # Glacier-style pricing with storage classes
+                storage_class = config.get("storageClass", "flexible")
+                
+                # Find the tier matching the storage class
+                tier_price = 0.0036  # Default to flexible
+                for tier in service_data["tiers"]:
+                    if tier.get("class") == storage_class:
+                        tier_price = tier["price"]
+                        break
+                
+                cost = usage_gb * tier_price
+                
+                print(f"  [GLACIER] usage={usage_gb}GB | class={storage_class} | rate=${tier_price}/GB | cost=${cost:.4f}")
+                
+                breakdown = {
+                    "usageGB": usage_gb,
+                    "storageClass": storage_class,
+                    "ratePerGB": tier_price,
+                    "model": "glacier"
+                }
+            else:
+                # S3-style tiered pricing with free tier
+                free_tier = service_data.get("freeTier", {})
+                free_storage = free_tier.get("storageGB", 0)
+                
+                # Apply free tier BEFORE calculating
+                billable_gb = max(0, usage_gb - free_storage)
+                cost = self._calculate_tier_cost(service_data["tiers"], billable_gb)
+                
+                print(f"  [S3_TIERED] usage={usage_gb}GB | free_tier={free_storage}GB | billable={billable_gb}GB | cost=${cost:.4f}")
+                
+                breakdown = {
+                    "usageGB": usage_gb,
+                    "freeGB": free_storage,
+                    "billableGB": billable_gb,
+                    "model": "tiered"
+                }
         elif "volumeTypes" in service_data:
             # EBS volume types
             volume_type = config.get("volumeType", "gp3")
