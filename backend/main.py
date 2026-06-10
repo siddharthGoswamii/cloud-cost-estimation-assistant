@@ -22,17 +22,17 @@ from models import (
 )
 from service_detector import ServiceDetector, ConversationalAgent
 from conversational_cost_agent import ConversationalCostAgent
-
-# Initialize service detector and conversational agent
-service_detector = ServiceDetector()
-conversational_agent = ConversationalAgent()
 from pricing_engine import PricingEngine
 
-# Initialize pricing engine first
-pricing_engine = PricingEngine()
+# Initialize pricing engine ONCE with live pricing enabled
+pricing_engine = PricingEngine(use_live_pricing=True)
 
-# Initialize advanced conversational agent with pricing engine
+# Initialize advanced conversational agent with the SAME pricing engine instance
 advanced_agent = ConversationalCostAgent(pricing_engine=pricing_engine)
+
+# Keep legacy agents for backward compatibility (if needed)
+service_detector = ServiceDetector()
+conversational_agent = ConversationalAgent()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -48,9 +48,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Initialize pricing engine
-pricing_engine = PricingEngine()
 
 
 # ==================== STATIC FILES ====================
