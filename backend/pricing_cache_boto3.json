@@ -55,7 +55,13 @@
       "timestamp": "2026-06-10T15:46:53.697364",
       "instance_type": "db.r5.large",
       "region": "us-west-2"
+    },
+    "EC2_t3.medium_us-east-1_Linux": {
+      "price": 0.0416,
+      "timestamp": "2026-06-10T15:54:36.786435",
+      "instance_type": "t3.medium",
+      "region": "us-east-1"
     }
   },
-  "last_updated": "2026-06-10T15:46:53.699475"
+  "last_updated": "2026-06-10T15:54:36.787442"
 }

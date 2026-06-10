@@ -362,10 +362,13 @@ class ConversationalCostAgent:
         # Extract storage - IMPROVED: Better patterns for various formats
         # For S3 and Glacier, look for storage amounts in the specific context
         if service_name == "S3":
-            # For S3: look for "holding XTB" or "XTB of data" (but not "for cold/archive")
+            # For S3: look for various storage patterns
             storage_patterns = [
                 r'holding\s+(\d+(?:\.\d+)?)\s*(TB|GB)\s+of\s+data',  # "holding 31TB of data"
-                r'(\d+(?:\.\d+)?)\s*(TB|GB)\s+of\s+data(?!\s*,\s*while)',  # "31TB of data"
+                r'(\d+(?:\.\d+)?)\s*(TB|GB)\s+of\s+data',  # "31TB of data"
+                r'(\d+(?:\.\d+)?)\s*(TB|GB)\s+(?:in\s+)?(?:S3|bucket)',  # "100GB in S3" or "100GB bucket"
+                r'S3.*?(\d+(?:\.\d+)?)\s*(TB|GB)',  # "S3 with 100GB"
+                r'bucket.*?(\d+(?:\.\d+)?)\s*(TB|GB)',  # "bucket with 100GB"
             ]
             
             for pattern in storage_patterns:
@@ -376,6 +379,11 @@ class ConversationalCostAgent:
                     config.storage_gb = storage_value * 1000 if storage_unit == "TB" else storage_value
                     config.assumptions.append(f"Storage explicitly specified: {config.storage_gb}GB")
                     break
+            
+            # If no storage found, set a default assumption
+            if config.storage_gb is None:
+                config.storage_gb = 100  # Default 100GB
+                config.assumptions.append(f"[ASSUMPTION] Storage: 100GB (default - no storage amount specified)")
         elif service_name == "Glacier":
             # For Glacier: look for "XTB for cold/archive" or "with XTB for"
             storage_patterns = [
